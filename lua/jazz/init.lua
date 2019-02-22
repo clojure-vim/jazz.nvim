@@ -62,5 +62,4 @@ jazz.require_all = function()
   acid.run(ops['ns-load-all']{})
 end
 
---vim.api.nvim_command("command! -nargs=0 RequireAll lua jazz.require_all()")
-vim.api.nvim_command("command! -nargs=? JazzFindUsages lua jazz.find_usages(<f-args>)")
+

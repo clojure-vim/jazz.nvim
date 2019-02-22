@@ -15,19 +15,47 @@ end
 
 local jazz_nrepl = {}
 
-local select_portno = function(obj)
+local select_portno = function(handler)
   return impromptu.new.form{
       title = "Select port number:",
       questions = {portno = {description = "Port number"}},
       handler = function(session, result)
-        obj.port = tonumber(result.portno)
-
-        session:pop()
-        session.lines.port.description = "Port number (" .. result.portno .. ")"
-        session.lines.port.hl = "String"
-        return false
+        return handler(session, result)
       end
   }
+end
+
+local existing = function(obj)
+  return select_portno(function(_, handler)
+    local ix = connections:add{"127.0.0.1", tonumber(handler.portno)}
+    connections:select(obj.pwd, ix)
+    return true
+  end)
+end
+
+local toolsdeps = function(obj)
+  local files = vim.api.nvim_call_function("expand", {"**/*.edn", true, true})
+  if #files == 1 and files[1] == "deps.edn" then
+    nrepl.start{pwd = obj.pwd}
+    return true
+  end
+
+  local options = {}
+
+  for _, v in ipairs(files) do
+    options[v] = {description = v}
+  end
+
+  obj.session:stack(impromptu.new.ask{
+      title = "Select deps.edn file",
+      options = options,
+      handler = function(_, selected)
+        nrepl.start{pwd = obj.pwd, deps_file = selected.description}
+        return true
+      end
+    })
+
+  return false
 end
 
 local connect_nrepl = function(obj)
@@ -114,6 +142,12 @@ local custom_nrepl = function(obj)
         return true
       elseif selected.index == "port" then
         session:stack(select_portno(nrepl_config))
+        --[[
+          session:pop()
+          session.lines.port.description = "Port number (" .. result.portno .. ")"
+          session.lines.port.hl = "String"
+          return false
+        --]]
       elseif selected.index == "connect" then
         session:stack(connect_nrepl(nrepl_config))
       elseif selected.index == "abort" then
@@ -185,6 +219,16 @@ jazz_nrepl.nrepl_menu = function(pwd)
     hl = "Function"
   }
 
+  opts.existing = {
+    description = "Connect to existing nrepl",
+    hl = "Function"
+  }
+
+  opts.toolsdeps = {
+    description = "Spawn from deps.edn",
+    hl = "Function"
+  }
+
   impromptu.ask{
     question = "Select nrepl to connect to:",
     options = opts,
@@ -196,6 +240,12 @@ jazz_nrepl.nrepl_menu = function(pwd)
       elseif selected.index == "refresh" then
         nrepl.stop{pwd = pwd}
         nrepl.start{pwd = pwd}
+      elseif selected.index ==  "toolsdeps" then
+        toolsdeps{pwd = pwd, session = session}
+        return false
+      elseif selected.index ==  "existing" then
+        session:stack(existing{pwd = pwd})
+        return false
       elseif selected.index ==  "custom" then
         session:stack(custom_nrepl{pwd = pwd})
         return false
@@ -206,7 +256,5 @@ jazz_nrepl.nrepl_menu = function(pwd)
     end
   }
 end
-
-vim.api.nvim_command("command! -nargs=0 JazzNrepl lua require('jazz.nrepl').nrepl_menu()")
 
 return jazz_nrepl
