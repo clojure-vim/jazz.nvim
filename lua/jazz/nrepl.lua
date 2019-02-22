@@ -43,7 +43,10 @@ local toolsdeps = function(obj)
   local options = {}
 
   for _, v in ipairs(files) do
-    options[v] = {description = v}
+    options[v] = {
+      description = v,
+      hl = "String"
+    }
   end
 
   obj.session:stack(impromptu.new.ask{
