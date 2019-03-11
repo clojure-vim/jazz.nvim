@@ -58,8 +58,4 @@ jazz.find_usages = function(symbol, ns)
   acid.run(features.list_usage(acid_handler, symbol, ns, pwd, fname))
 end
 
-jazz.require_all = function()
-  acid.run(ops['ns-load-all']{})
-end
-
-
+return jazz

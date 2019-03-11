@@ -17,7 +17,7 @@ local jazz_nrepl = {}
 
 local select_portno = function(handler)
   return impromptu.new.form{
-      title = "Select port number:",
+      title = "🎵 Select port number:",
       questions = {portno = {description = "Port number"}},
       handler = function(session, result)
         return handler(session, result)
@@ -35,6 +35,7 @@ end
 
 local toolsdeps = function(obj)
   local files = vim.api.nvim_call_function("expand", {"**/*.edn", true, true})
+
   if #files == 1 and files[1] == "deps.edn" then
     nrepl.start{pwd = obj.pwd}
     return true
@@ -45,15 +46,15 @@ local toolsdeps = function(obj)
   for _, v in ipairs(files) do
     options[v] = {
       description = v,
-      hl = "String"
+      hl = "Function"
     }
   end
 
   obj.session:stack(impromptu.new.ask{
-      title = "Select deps.edn file",
+      title = "🎵 Select deps.edn file",
       options = options,
       handler = function(_, selected)
-        nrepl.start{pwd = obj.pwd, deps_file = selected.description}
+        nrepl.start{pwd = obj.pwd, deps_file = selected.description, alias = "-R:nrepl"}
         return true
       end
     })
@@ -63,7 +64,7 @@ end
 
 local connect_nrepl = function(obj)
   return impromptu.new.form{
-      title = "Connect nrepl to:",
+      title = "🎵 Connect nrepl to:",
       questions = {
         portno = {description = "Port number"},
         host = {description = "Host address"}
@@ -136,7 +137,7 @@ local custom_nrepl = function(obj)
 
 
   return impromptu.new.ask{
-    question = "Configure the custom nrepl:",
+    title = "🎵 Configure the custom nrepl:",
     quitable = false,
     options = opts,
     handler = function(session, selected)
@@ -144,13 +145,12 @@ local custom_nrepl = function(obj)
         nrepl.start(nrepl_config)
         return true
       elseif selected.index == "port" then
-        session:stack(select_portno(nrepl_config))
-        --[[
-          session:pop()
-          session.lines.port.description = "Port number (" .. result.portno .. ")"
-          session.lines.port.hl = "String"
+        session:stack(select_portno(function(ss, result)
+          ss:pop()
+          ss.lines.port.description = "Port number (" .. result.portno .. ")"
+          ss.lines.port.hl = "String"
           return false
-        --]]
+        end))
       elseif selected.index == "connect" then
         session:stack(connect_nrepl(nrepl_config))
       elseif selected.index == "abort" then
@@ -205,7 +205,7 @@ jazz_nrepl.nrepl_menu = function(pwd)
       }
 
       str = str .. " (current)"
-      opt.hl = "String"
+      opt.hsl = "String"
     end
 
     opt.description = str
@@ -233,7 +233,7 @@ jazz_nrepl.nrepl_menu = function(pwd)
   }
 
   impromptu.ask{
-    question = "Select nrepl to connect to:",
+    title = "🎵 Select nrepl to connect to:",
     options = opts,
     handler = function(session, selected)
       if selected.index == "new" then
@@ -243,13 +243,13 @@ jazz_nrepl.nrepl_menu = function(pwd)
       elseif selected.index == "refresh" then
         nrepl.stop{pwd = pwd}
         nrepl.start{pwd = pwd}
-      elseif selected.index ==  "toolsdeps" then
+      elseif selected.index == "toolsdeps" then
         toolsdeps{pwd = pwd, session = session}
         return false
-      elseif selected.index ==  "existing" then
+      elseif selected.index == "existing" then
         session:stack(existing{pwd = pwd})
         return false
-      elseif selected.index ==  "custom" then
+      elseif selected.index == "custom" then
         session:stack(custom_nrepl{pwd = pwd})
         return false
       else
