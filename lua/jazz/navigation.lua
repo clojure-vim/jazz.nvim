@@ -4,18 +4,12 @@ local ops = require("acid.ops")
 local impromptu = require("impromptu")
 
 
---acid.run(ops['ns-load-all']{})
 local navigation = {}
 
 navigation.symbols = function(ns)
   if ns == nil then
     local current_ns = vim.api.nvim_call_function("AcidGetNs", {})
-    local root
-
-    for part in string.gmatch(current_ns, "(%w+)") do
-      root = part
-      break
-    end
+    local root = string.match(current_ns, "(%w+)")
 
     if root ~= nil then
       ns = root
@@ -32,7 +26,7 @@ navigation.symbols = function(ns)
     handler = function(_, selected)
       acid.run(ops["info"]{ns = selected.ns, symbol = selected.var}:with_handler(function(ret)
 
-        local fpath = vim.api.nvim_call_function("AcidFindFileInPath", {ret})
+        local fpath = vim.api.nvim_call_function("AcidFindFileInPath", {ret.file, ret.resource})
         vim.api.nvim_command("edit " .. fpath)
 
         vim.api.nvim_win_set_cursor(window, {ret.line, ret.column})
