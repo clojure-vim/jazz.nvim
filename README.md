@@ -18,9 +18,14 @@ Plug 'clojure-vim/jazz.nvim'
 
 ## Features
 
-* `JazzNrepl` or `<C-j>n`: Creates a menu to select the nrepl connection.
-* `JazzFindUsages` or `<C-j>u`: Lists all the usages of the symbol under the cursor.
-* `JazzNavigateSymbols` or `<C-j>s`: Lists all symbols in the project and moves to the selected symbol's definition.
+### `JazzNrepl` or `<C-j>n`: Creates a menu to select the nrepl connection.
+[![asciicast](https://asciinema.org/a/PkPPUEYRvVqVks2IxxJI55s34.svg)](https://asciinema.org/a/PkPPUEYRvVqVks2IxxJI55s34)
+
+### `JazzFindUsages` or `<C-j>u`: Lists all the usages of the symbol under the cursor.
+[![asciicast](https://asciinema.org/a/236703.svg)](https://asciinema.org/a/236703)
+
+### `JazzNavigateSymbols` or `<C-j>s`: Lists all symbols in the project and moves to the selected symbol's definition.
+[![asciicast](https://asciinema.org/a/236704.svg)](https://asciinema.org/a/236704)
 
 
 ## Extending

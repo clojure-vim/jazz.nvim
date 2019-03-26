@@ -209,7 +209,8 @@ jazz_nrepl.nrepl_menu = function(pwd)
     end
 
     opt.description = str
-    opts[ix] = opt
+    opt.index = ix
+    opts["conn" .. ix] = opt
   end
 
   opts.new = {
@@ -253,7 +254,7 @@ jazz_nrepl.nrepl_menu = function(pwd)
         session:stack(custom_nrepl{pwd = pwd})
         return false
       else
-        connections:select(pwd, selected)
+        connections:select(pwd, selected.index)
       end
       return true
     end
