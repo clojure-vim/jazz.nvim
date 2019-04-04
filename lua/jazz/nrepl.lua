@@ -189,18 +189,20 @@ jazz_nrepl.nrepl_menu = function(pwd)
     check = function(_) return false end
   end
 
-  for ix, v in ipairs(connections.store) do
+  for ix, v in pairs(connections.store) do
     local opt = {}
     local str = "nrepl://" .. v[1] .. ":" .. v[2]
 
     if check(v) then
       opts.close = {
         description = "Close connection to " .. str ,
+        index = ix,
         hl = "Function"
       }
 
       opts.refresh = {
         description = "Refresh connections",
+        index = ix,
         hl = "Function"
       }
 
