@@ -27,8 +27,8 @@ end
 
 local existing = function(obj)
   return select_portno(function(_, handler)
-    local ix = connections:add{"127.0.0.1", tonumber(handler.portno)}
-    connections:select(obj.pwd, ix)
+    local ix = connections.add{"127.0.0.1", tonumber(handler.portno)}
+    connections.select(obj.pwd, ix)
     return true
   end)
 end
@@ -257,7 +257,7 @@ jazz_nrepl.nrepl_menu = function(pwd)
         session:stack(custom_nrepl{pwd = pwd})
         return false
       else
-        connections:select(pwd, selected.index)
+        connections.select(pwd, selected.index)
       end
       return true
     end
