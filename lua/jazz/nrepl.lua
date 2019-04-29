@@ -208,7 +208,7 @@ jazz_nrepl.nrepl_menu = function(pwd)
         }
 
         str = str .. " (current)"
-        opt.hsl = "String"
+        opt.hl = "String"
       end
 
       opt.description = str
