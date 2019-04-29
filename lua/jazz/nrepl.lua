@@ -190,29 +190,31 @@ jazz_nrepl.nrepl_menu = function(pwd)
   end
 
   for ix, v in pairs(connections.store) do
-    local opt = {}
-    local str = "nrepl://" .. v[1] .. ":" .. v[2]
+    if #v == 2 then
+      local opt = {}
+      local str = "nrepl://" .. v[1] .. ":" .. v[2]
 
-    if check(v) then
-      opts.close = {
-        description = "Close connection to " .. str ,
-        index = ix,
-        hl = "Function"
-      }
+      if check(v) then
+        opts.close = {
+          description = "Close connection to " .. str ,
+          index = ix,
+          hl = "Function"
+        }
 
-      opts.refresh = {
-        description = "Refresh connections",
-        index = ix,
-        hl = "Function"
-      }
+        opts.refresh = {
+          description = "Refresh connections",
+          index = ix,
+          hl = "Function"
+        }
 
-      str = str .. " (current)"
-      opt.hsl = "String"
+        str = str .. " (current)"
+        opt.hsl = "String"
+      end
+
+      opt.description = str
+      opt.index = ix
+      opts["conn" .. ix] = opt
     end
-
-    opt.description = str
-    opt.index = ix
-    opts["conn" .. ix] = opt
   end
 
   opts.new = {
