@@ -3,10 +3,15 @@ local acid = require('acid')
 local forms = require('acid.forms')
 local commands = require('acid.commands')
 local impromptu = require('impromptu')
+local log = require('jazz.log').msg
 
 local usages = {}
 
 usages.find_all = function(symbol, ns)
+  if not acid.connected() then
+    log"No connection present. Aborting"
+    return
+  end
   symbol = symbol or forms.symbol_under_cursor()
   ns = ns or vim.api.nvim_call_function("AcidGetNs", {})
 

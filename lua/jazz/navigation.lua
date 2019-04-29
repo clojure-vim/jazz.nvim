@@ -2,11 +2,16 @@
 local acid = require("acid")
 local ops = require("acid.ops")
 local impromptu = require("impromptu")
+local log = require("jazz.log").msg
 
 
 local navigation = {}
 
 navigation.symbols = function(ns)
+  if not acid.connected() then
+    log"No connection present. Aborting"
+    return
+  end
   if ns == nil then
     local current_ns = vim.api.nvim_call_function("AcidGetNs", {})
     local root = string.match(current_ns, "(%w+)")
