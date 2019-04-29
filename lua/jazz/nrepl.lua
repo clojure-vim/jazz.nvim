@@ -249,8 +249,7 @@ jazz_nrepl.nrepl_menu = function(pwd)
         nrepl.stop{pwd = pwd}
         nrepl.start{pwd = pwd}
       elseif selected.index == "toolsdeps" then
-        toolsdeps{pwd = pwd, session = session}
-        return false
+        return toolsdeps{pwd = pwd, session = session}
       elseif selected.index == "existing" then
         session:stack(existing{pwd = pwd})
         return false
