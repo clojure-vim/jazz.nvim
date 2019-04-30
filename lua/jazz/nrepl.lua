@@ -27,8 +27,8 @@ end
 
 local existing = function(obj)
   return select_portno(function(_, handler)
-    local ix = connections:add{"127.0.0.1", tonumber(handler.portno)}
-    connections:select(obj.pwd, ix)
+    local ix = connections.add{"127.0.0.1", tonumber(handler.portno)}
+    connections.select(obj.pwd, ix)
     return true
   end)
 end
@@ -190,29 +190,31 @@ jazz_nrepl.nrepl_menu = function(pwd)
   end
 
   for ix, v in pairs(connections.store) do
-    local opt = {}
-    local str = "nrepl://" .. v[1] .. ":" .. v[2]
+    if #v == 2 then
+      local opt = {}
+      local str = "nrepl://" .. v[1] .. ":" .. v[2]
 
-    if check(v) then
-      opts.close = {
-        description = "Close connection to " .. str ,
-        index = ix,
-        hl = "Function"
-      }
+      if check(v) then
+        opts.close = {
+          description = "Close connection to " .. str ,
+          index = ix,
+          hl = "Function"
+        }
 
-      opts.refresh = {
-        description = "Refresh connections",
-        index = ix,
-        hl = "Function"
-      }
+        opts.refresh = {
+          description = "Refresh connections",
+          index = ix,
+          hl = "Function"
+        }
 
-      str = str .. " (current)"
-      opt.hsl = "String"
+        str = str .. " (current)"
+        opt.hl = "String"
+      end
+
+      opt.description = str
+      opt.index = ix
+      opts["conn" .. ix] = opt
     end
-
-    opt.description = str
-    opt.index = ix
-    opts["conn" .. ix] = opt
   end
 
   opts.new = {
@@ -247,8 +249,7 @@ jazz_nrepl.nrepl_menu = function(pwd)
         nrepl.stop{pwd = pwd}
         nrepl.start{pwd = pwd}
       elseif selected.index == "toolsdeps" then
-        toolsdeps{pwd = pwd, session = session}
-        return false
+        return toolsdeps{pwd = pwd, session = session}
       elseif selected.index == "existing" then
         session:stack(existing{pwd = pwd})
         return false
@@ -256,7 +257,7 @@ jazz_nrepl.nrepl_menu = function(pwd)
         session:stack(custom_nrepl{pwd = pwd})
         return false
       else
-        connections:select(pwd, selected.index)
+        connections.select(pwd, selected.index)
       end
       return true
     end
