@@ -9,4 +9,5 @@ augroup Jazz
   au FileType clojure nmap <buffer> <C-j>s <Cmd>JazzNavigateSymbols<Cr>
   au FileType clojure nmap <buffer> <C-j>a <Cmd>lua require("jazz.files").alternate()<Cr>
   au FileType clojure nmap <buffer> <C-j>f <Cmd>lua require("jazz.files").new()<Cr>
+  au FileType clojure nmap <buffer> <C-j>c <Cmd>lua require("jazz.interrupt").select_session()<Cr>
 augroup END

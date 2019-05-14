@@ -3,6 +3,8 @@ local impromptu = require("impromptu")
 local connections = require('acid.connections')
 local nrepl = require('acid.nrepl')
 local acid_utils = require('acid.utils')
+local acid = require("acid")
+local eval = require("acid.ops").eval
 
 local find_value = function(tbl, val)
   for ix, v in ipairs(tbl) do
@@ -17,11 +19,11 @@ local jazz_nrepl = {}
 
 local select_portno = function(handler)
   return impromptu.new.form{
-      title = "🎵 Select port number:",
-      questions = {portno = {description = "Port number"}},
-      handler = function(session, result)
-        return handler(session, result)
-      end
+    title = "🎵 Select port number:",
+    questions = {portno = {description = "Port number"}},
+    handler = function(session, result)
+      return handler(session, result)
+    end
   }
 end
 
@@ -37,8 +39,57 @@ local toolsdeps = function(obj)
   local files = vim.api.nvim_call_function("expand", {"**/*.edn", true, true})
 
   if #files == 1 and files[1] == "deps.edn" then
-    nrepl.start{pwd = obj.pwd}
-    return true
+    local admin = acid.admin_session()
+    if admin == nil then
+      nrepl.start{pwd = obj.pwd}
+      return true
+    else
+      local options = {
+        start = {
+          description = "Start",
+          hl = "Function"
+        }
+      }
+      local spawn_options = {
+        pwd = obj.pwd,
+        alias = {}
+      }
+      local new_session = obj.session:stack(impromptu.new.ask{
+        title = "🎵 From deps.edn",
+        options = options,
+        handler = function(session, selected)
+          if selected.tp == "alias" then
+            table.insert(spawn_options.alias, selected.description)
+            session.lines[selected.description].hl = "String"
+          else
+            nrepl.start(spawn_options)
+            return true
+          end
+        end
+      })
+
+      acid.run(eval{
+          code = '(map println (keys (:aliases (clojure.edn/read-string (slurp "' ..
+          obj.pwd .. "/" ..files[1] ..
+        '")))))'}:with_handler(function(data)
+          if data.status or data.value then
+            return
+          end
+
+          for _, v in ipairs(acid_utils.split_lines(data.out)) do
+            options[v] = {
+              description = v,
+              tp = "alias",
+              hl = "Comment"
+            }
+          end
+
+          new_session:render()
+        end),
+        admin)
+
+      return false
+    end
   end
 
   local options = {}
@@ -64,28 +115,28 @@ end
 
 local connect_nrepl = function(obj)
   return impromptu.new.form{
-      title = "🎵 Connect nrepl to:",
-      questions = {
-        portno = {description = "Port number"},
-        host = {description = "Host address"}
-      },
-      handler = function(session, result)
-        obj.port = tonumber(result.portno)
-        obj.host = result.host
-        obj.connect = true
+    title = "🎵 Connect nrepl to:",
+    questions = {
+      portno = {description = "Port number"},
+      host = {description = "Host address"}
+    },
+    handler = function(session, result)
+      obj.port = tonumber(result.portno)
+      obj.host = result.host
+      obj.connect = true
 
-        session:pop()
+      session:pop()
 
-        session.lines.connect.description = "Connect to remote nrepl? (true)"
-        session.lines.connect.hl = "String"
+      session.lines.connect.description = "Connect to remote nrepl? (true)"
+      session.lines.connect.hl = "String"
 
-        session.lines.host.description = "Connect to address(" .. result.host .. ")"
-        session.lines.host.hl = "String"
+      session.lines.host.description = "Connect to address(" .. result.host .. ")"
+      session.lines.host.hl = "String"
 
-        session.lines.port.description = "Port number (" .. result.portno .. ")"
-        session.lines.port.hl = "String"
-        return false
-      end
+      session.lines.port.description = "Port number (" .. result.portno .. ")"
+      session.lines.port.hl = "String"
+      return false
+    end
   }
 end
 
@@ -110,23 +161,23 @@ local custom_nrepl = function(obj)
   }
 
   --opts.bind = {
-    --description = "Bind to address (127.0.0.1)",
-    --hl = "Comment"
+  --description = "Bind to address (127.0.0.1)",
+  --hl = "Comment"
   --}
 
   --opts.host = {
-    --description = "Connect to address (127.0.0.1)",
-    --hl = "Comment"
+  --description = "Connect to address (127.0.0.1)",
+  --hl = "Comment"
   --}
 
   --opts.connect = {
-    --description = "Connect to remote nrepl? (false)",
-    --hl = "Comment"
+  --description = "Connect to remote nrepl? (false)",
+  --hl = "Comment"
   --}
 
   --opts.pwd = {
-    --description = "Directory (" .. obj.pwd .. ")",
-    --hl = "Comment"
+  --description = "Directory (" .. obj.pwd .. ")",
+  --hl = "Comment"
   --}
 
   opts.start = {description = "Start with custom configuration"}
@@ -168,6 +219,7 @@ local custom_nrepl = function(obj)
     end
   }
 end
+
 
 jazz_nrepl.nrepl_menu = function(pwd)
   pwd = pwd or vim.api.nvim_call_function("getcwd", {})
