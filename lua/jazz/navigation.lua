@@ -1,5 +1,6 @@
 -- luacheck: globals vim
 local acid = require("acid")
+local go_to = require("acid.features").go_to
 local ops = require("acid.ops")
 local impromptu = require("impromptu")
 local log = require("jazz.log").msg
@@ -29,14 +30,7 @@ navigation.symbols = function(ns)
     title = "🎵 Navigate to symbols",
     options = {},
     handler = function(_, selected)
-      acid.run(ops["info"]{ns = selected.ns, symbol = selected.var}:with_handler(function(ret)
-
-        local fpath = vim.api.nvim_call_function("AcidFindFileInPath", {ret.file, ret.resource})
-        vim.api.nvim_command("edit " .. fpath)
-
-        vim.api.nvim_win_set_cursor(window, {ret.line, ret.column})
-
-      end))
+      go_to(selected.var, selected.ns)
       return true
     end
   }
