@@ -35,6 +35,56 @@ local existing = function(obj)
   end)
 end
 
+local run_alias = function(obj)
+  local options = {
+    start = {
+      description = "Start",
+      hl = "Function"
+    }
+  }
+
+  local spawn_options = {
+    pwd = obj.pwd,
+    alias = {}
+  }
+
+  local new_session = obj.session:stack(impromptu.new.ask{
+    title = "🎵 From deps.edn",
+    options = options,
+    handler = function(session, selected)
+      if selected.tp == "alias" then
+        table.insert(spawn_options.alias, selected.description)
+        session.lines[selected.description].hl = "String"
+      else
+        nrepl.start(spawn_options)
+        return true
+      end
+    end
+  })
+  local admin = acid.admin_session()
+  acid.run(eval{
+      code = '(map println (keys (:aliases (clojure.edn/read-string (slurp "' ..
+      obj.pwd .. "/" ..obj.file ..
+    '")))))'}:with_handler(function(data)
+      if data.status or data.value then
+        return
+      end
+
+      for _, v in ipairs(acid_utils.split_lines(data.out)) do
+        options[v] = {
+          description = v,
+          tp = "alias",
+          hl = "Comment"
+        }
+      end
+
+      new_session:render()
+    end),
+    admin)
+
+  return false
+end
+
 local toolsdeps = function(obj)
   local files = vim.api.nvim_call_function("expand", {"**/*.edn", true, true})
 
@@ -44,51 +94,7 @@ local toolsdeps = function(obj)
       nrepl.start{pwd = obj.pwd}
       return true
     else
-      local options = {
-        start = {
-          description = "Start",
-          hl = "Function"
-        }
-      }
-      local spawn_options = {
-        pwd = obj.pwd,
-        alias = {}
-      }
-      local new_session = obj.session:stack(impromptu.new.ask{
-        title = "🎵 From deps.edn",
-        options = options,
-        handler = function(session, selected)
-          if selected.tp == "alias" then
-            table.insert(spawn_options.alias, selected.description)
-            session.lines[selected.description].hl = "String"
-          else
-            nrepl.start(spawn_options)
-            return true
-          end
-        end
-      })
-
-      acid.run(eval{
-          code = '(map println (keys (:aliases (clojure.edn/read-string (slurp "' ..
-          obj.pwd .. "/" ..files[1] ..
-        '")))))'}:with_handler(function(data)
-          if data.status or data.value then
-            return
-          end
-
-          for _, v in ipairs(acid_utils.split_lines(data.out)) do
-            options[v] = {
-              description = v,
-              tp = "alias",
-              hl = "Comment"
-            }
-          end
-
-          new_session:render()
-        end),
-        admin)
-
-      return false
+        return run_alias{file = files[1], session = obj.session, pwd = obj.pwd}
     end
   end
 
@@ -104,9 +110,8 @@ local toolsdeps = function(obj)
   obj.session:stack(impromptu.new.ask{
       title = "🎵 Select deps.edn file",
       options = options,
-      handler = function(_, selected)
-        nrepl.start{pwd = obj.pwd, deps_file = selected.description, alias = "-R:nrepl"}
-        return true
+      handler = function(session, selected)
+        return run_alias{file = selected.description, session = session, pwd = obj.pwd}
       end
     })
 
