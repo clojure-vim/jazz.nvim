@@ -3,6 +3,8 @@ local impromptu = require("impromptu")
 local connections = require('acid.connections')
 local nrepl = require('acid.nrepl')
 local acid_utils = require('acid.utils')
+local acid = require('acid')
+local ops = require('acid.ops')
 
 local find_value = function(tbl, val)
   for ix, v in ipairs(tbl) do
@@ -33,12 +35,55 @@ local existing = function(obj)
   end)
 end
 
+local parse_aliases = function(obj, file)
+  local config = {middlewares = nrepl.default_middlewares, pwd = obj.pwd}
+  local aliases = {}
+  local menu = impromptu.new.ask{
+      title = "🎵 Select alias",
+      options = {
+        start = {
+          description = "Start nrepl",
+          hl = "Float"
+        }
+      },
+      handler = function(session, selected)
+        local ix = selected.index
+
+        if ix == "start" then
+        else
+          local toggle = not (aliases[ix] or false)
+          aliases[ix] = toggle
+          if toggle then
+           session.lines[ix].hl = "String"
+         else
+           session.lines[ix].hl = "Comment"
+         end
+        end
+        return false
+      end
+  }
+  local conn = acid.admin_session()
+  local command = ops.eval{code = '(run! println (keys (:aliases (read-string (slurp "' .. obj.pwd .. "/" .. file .. '")))))'}:with_handler(function(obj)
+    if obj.out ~= nil then
+      local out = vim.trim(obj.out)
+      menu.lines[out] = {description = out, hl = "Comment"}
+      tap(menu)
+    elseif obj.err ~= nil or obj.ex ~= nil then
+      vim.api.nvim_err_writeln(obj.err or obj.ex)
+    end
+    end)
+  acid.run(command, conn)
+
+  return menu
+end
+
+
 local toolsdeps = function(obj)
   local files = vim.api.nvim_call_function("expand", {"**/*.edn", true, true})
 
   if #files == 1 and files[1] == "deps.edn" then
-    nrepl.start{pwd = obj.pwd}
-    return true
+    obj.session:stack(parse_aliases(obj, files[1]))
+    return false
   end
 
   local options = {}
@@ -108,26 +153,6 @@ local custom_nrepl = function(obj)
     description = "Port number (auto)",
     hl = "Comment"
   }
-
-  --opts.bind = {
-    --description = "Bind to address (127.0.0.1)",
-    --hl = "Comment"
-  --}
-
-  --opts.host = {
-    --description = "Connect to address (127.0.0.1)",
-    --hl = "Comment"
-  --}
-
-  --opts.connect = {
-    --description = "Connect to remote nrepl? (false)",
-    --hl = "Comment"
-  --}
-
-  --opts.pwd = {
-    --description = "Directory (" .. obj.pwd .. ")",
-    --hl = "Comment"
-  --}
 
   opts.start = {description = "Start with custom configuration"}
   opts.abort = {
