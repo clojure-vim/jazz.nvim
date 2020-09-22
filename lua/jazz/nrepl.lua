@@ -22,7 +22,7 @@ local empty = function(coll)
 end
 
 local read_aliases = function(fname, handler)
-  if vim.fn.filereadable(fname) then
+  if vim.fn.filereadable(fname) == 1 then
     acid.run(ops.eval{code = '(run! println (keys (:aliases (read-string (slurp "' .. fname .. '")))))'}:with_handler(function(obj)
       if obj.out ~= nil then
         local out = vim.trim(obj.out)
