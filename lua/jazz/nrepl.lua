@@ -3,265 +3,307 @@ local impromptu = require("impromptu")
 local connections = require('acid.connections')
 local nrepl = require('acid.nrepl')
 local acid_utils = require('acid.utils')
+local acid = require('acid')
+local ops = require('acid.ops')
+local os = require('os')
 
-local find_value = function(tbl, val)
-  for ix, v in ipairs(tbl) do
-    if v == val then
-      return ix
-    end
+local empty = function(coll)
+  local ret = true
+  for _, _ in pairs(coll) do
+    ret = false
+    break
   end
-  return -1
+  for _, _ in ipairs(coll) do
+    ret = false
+    break
+  end
+
+  return ret
+end
+
+local read_aliases = function(fname, handler)
+  if vim.fn.filereadable(fname) == 1 then
+    acid.run(ops.eval{code = '(run! println (keys (:aliases (read-string (slurp "' .. fname .. '")))))'}:with_handler(function(obj)
+      if obj.out ~= nil then
+        local out = vim.trim(obj.out)
+        handler(out)
+      elseif obj.err ~= nil or obj.ex ~= nil then
+        vim.api.nvim_err_writeln(obj.err or obj.ex)
+      end
+      end), acid.admin_session())
+    end
 end
 
 local jazz_nrepl = {}
 
-local select_portno = function(handler)
+-- nrepl option support:
+--port = select_portno
+--middlewares = configure_middlewares
+--alias = parse_aliases
+--bind = not supported
+--deps_file = not supported
+--skip_autocmd = not supported
+--disable_output_capture = not supported
+
+local select_portno = function(inner_handler)
   return impromptu.new.form{
       title = "🎵 Select port number:",
       questions = {portno = {description = "Port number"}},
       handler = function(session, result)
-        return handler(session, result)
+        return inner_handler(session, result)
       end
   }
 end
 
 local existing = function(obj)
-  return select_portno(function(_, handler)
-    local ix = connections.add{"127.0.0.1", tonumber(handler.portno)}
-    connections.select(obj.pwd, ix)
-    return true
-  end)
-end
-
-local toolsdeps = function(obj)
-  local files = vim.api.nvim_call_function("expand", {"**/*.edn", true, true})
-
-  if #files == 1 and files[1] == "deps.edn" then
-    nrepl.start{pwd = obj.pwd}
-    return true
+  local opts = {}
+  for ix, v in pairs(connections.store) do
+    if #v == 2 then
+      local opt = {}
+      local str = "nrepl://" .. v[1] .. ":" .. v[2]
+      opt.description = str
+      opt.index = ix
+      opts[ix] = opt
+    end
   end
-
-  local options = {}
-
-  for _, v in ipairs(files) do
-    options[v] = {
-      description = v,
+  tap{(not empty(opts)), opts}
+  if not empty(opts) then
+    opts.new = {
+      description = "Connect to other existing nREPL",
       hl = "Function"
     }
+    opts.abort = {
+      description = "Cancel",
+      key = "q",
+      hl = "Character"
+    }
+    return impromptu.new.ask{
+      title = "🎵 Select nrepl to connect to:",
+      quitable = false,
+      options = opts,
+      handler = function(session, selected)
+        local ix = selected.index
+        if ix == "new" then
+          session:stack(select_portno(function(ss, result)
+            if result.portno ~= "" then
+              connections.select(obj.pwd, connections.add{"127.0.0.1", tonumber(result.portno)})
+              return true
+            else
+              ss:pop()
+              return false
+            end
+          end))
+        elseif ix == "abort" then
+          session:pop()
+        else
+          connections.select(obj.pwd, ix)
+        end
+      end
+    }
+  else
+    return select_portno(function(_, result)
+      if result.portno ~= "" then
+        connections.select(obj.pwd, connections.add{"127.0.0.1", tonumber(result.portno)})
+      end
+      return true
+    end)
   end
 
-  obj.session:stack(impromptu.new.ask{
-      title = "🎵 Select deps.edn file",
-      options = options,
-      handler = function(_, selected)
-        nrepl.start{pwd = obj.pwd, deps_file = selected.description, alias = "-R:nrepl"}
-        return true
-      end
-    })
-
-  return false
 end
 
-local connect_nrepl = function(obj)
-  return impromptu.new.form{
-      title = "🎵 Connect nrepl to:",
-      questions = {
-        portno = {description = "Port number"},
-        host = {description = "Host address"}
-      },
-      handler = function(session, result)
-        obj.port = tonumber(result.portno)
-        obj.host = result.host
-        obj.connect = true
+local parse_aliases = function(obj, file)
+  local aliases = {}
+  local session = obj.session
+  local conn = acid.admin_session()
 
-        session:pop()
+  local opts = {
+    confirm = {
+      description = "Confirm",
+      key = "c",
+      hl = "String"
+    },
+    abort = {
+      description = "Cancel",
+      key = "q",
+      hl = "Character"
+    }
+  }
 
-        session.lines.connect.description = "Connect to remote nrepl? (true)"
-        session.lines.connect.hl = "String"
+  for _, v in ipairs(obj.alias or {}) do
+    aliases[v] = true
+    opts[v] = {description = v, hl = "Function"}
+  end
 
-        session.lines.host.description = "Connect to address(" .. result.host .. ")"
-        session.lines.host.hl = "String"
+  local menu = impromptu.new.ask{
+      title = "🎵 Select aliases",
+      quitable = false,
+      options = opts,
+      handler = function(session, selected)
+        local ix = selected.index
 
-        session.lines.port.description = "Port number (" .. result.portno .. ")"
-        session.lines.port.hl = "String"
+        if ix == "confirm" then
+          local selected = {}
+          for k, v in pairs(aliases) do
+            if v then
+              table.insert(selected, k)
+            end
+          end
+          obj.alias = selected
+          session:pop()
+        elseif ix == "abort" then
+          session:pop()
+        else
+          local toggle = not (aliases[ix] or false)
+          aliases[ix] = toggle
+          if toggle then
+           session.lines[ix].hl = "Function"
+         else
+           session.lines[ix].hl = "Comment"
+         end
+        end
         return false
       end
   }
+
+  local main_config = os.getenv('HOME') .. "/.clojure/deps.edn"
+  local update_menu = function(out)
+    if menu.lines[out] == nil then
+      menu.lines[out] = {description = out, hl = "Comment"}
+      session:render()
+    end
+  end
+  read_aliases(main_config, update_menu)
+  read_aliases(file, update_menu)
+  return menu
 end
 
-local custom_nrepl = function(obj)
-  local opts = {}
-  local nrepl_config = {middlewares = nrepl.default_middlewares, pwd = obj.pwd}
-
+local configure_middlewares = function(obj)
+  local opts = {
+        confirm = {
+          description = "Confirm",
+          key = "c",
+          hl = "String"
+        },
+        abort = {
+          description = "Cancel",
+          key = "q",
+          hl = "Character"
+        }
+  }
+  local middlewares = {}
   for k, _ in pairs(nrepl.middlewares) do
     opts[k] = {
       description = k,
       hl = "Comment"
     }
   end
-
-  for _, k in ipairs(nrepl.default_middlewares) do
-    opts[k].hl = "String"
+  for _, k in ipairs(obj.middlewares or nrepl.default_middlewares) do
+    opts[k].hl = "Function"
+    middlewares[k] = true
   end
 
-  opts.port = {
-    description = "Port number (auto)",
-    hl = "Comment"
-  }
-
-  --opts.bind = {
-    --description = "Bind to address (127.0.0.1)",
-    --hl = "Comment"
-  --}
-
-  --opts.host = {
-    --description = "Connect to address (127.0.0.1)",
-    --hl = "Comment"
-  --}
-
-  --opts.connect = {
-    --description = "Connect to remote nrepl? (false)",
-    --hl = "Comment"
-  --}
-
-  --opts.pwd = {
-    --description = "Directory (" .. obj.pwd .. ")",
-    --hl = "Comment"
-  --}
-
-  opts.start = {description = "Start with custom configuration"}
-  opts.abort = {
-    description = "Abort",
-    key = "q"
-  }
-
-
   return impromptu.new.ask{
-    title = "🎵 Configure the custom nrepl:",
-    quitable = false,
+      title = "🎵 Select Middlewares",
+      quitable = false,
+      options = opts,
+      handler = function(session, selected)
+        local ix = selected.index
+        if ix == "confirm" then
+          local selected = {}
+          for k, v in pairs(middlewares) do
+            if v then
+              table.insert(selected, k)
+            end
+          end
+          obj.middlewares = selected
+          obj.session:pop()
+        elseif ix == "abort" then
+          obj.session:pop()
+        else
+          local toggle = not (middlewares[ix] or false)
+          middlewares[ix] = toggle
+          if toggle then
+           session.lines[ix].hl = "Function"
+           else
+             session.lines[ix].hl = "Comment"
+           end
+        end
+        return false
+    end
+  }
+end
+
+local custom_nrepl = function(obj)
+  local opts = {}
+
+  opts.port = {
+    description = "Configure Port Number",
+    hl = "Conditional"
+  }
+
+  opts.middlewares = {
+    description = "Configure Middlewares",
+    hl = "Conditional"
+  }
+
+  opts.aliases = {
+    description = "Configure Aliases",
+    hl = "Conditional"
+  }
+
+  opts.existing = {
+    description = "Connect to existing nREPL",
+    hl = "Function"
+  }
+
+  opts.start = {
+    description = "Start new nREPL",
+    hl = "Character"
+  }
+  return impromptu.new.ask{
+    title = "🎵 Configure the nREPL:",
     options = opts,
     handler = function(session, selected)
       if selected.index == "start" then
-        nrepl.start(nrepl_config)
+        nrepl.start(obj)
         return true
       elseif selected.index == "port" then
         session:stack(select_portno(function(ss, result)
           ss:pop()
-          ss.lines.port.description = "Port number (" .. result.portno .. ")"
-          ss.lines.port.hl = "String"
-          return false
+          if result.portno ~= "" then
+            obj.port = result.portno
+            ss.lines.port.description = "Configure Port Number [" .. result.portno .. "]"
+            ss.lines.port.hl = "Function"
+          else
+            obj.port = nil
+            ss.lines.port.description = "Configure Port Number"
+            ss.lines.port.hl = "Conditional"
+          end
         end))
-      elseif selected.index == "connect" then
-        session:stack(connect_nrepl(nrepl_config))
-      elseif selected.index == "abort" then
-        session:pop()
-      else
-        local ix = find_value(nrepl_config.middlewares, selected.index)
-        if ix == -1 then
-          table.insert(nrepl_config.middlewares, selected.index)
-          selected.hl = "String"
-        else
-          table.remove(nrepl_config.middlewares, ix)
-          selected.hl = "Comment"
-        end
+      elseif selected.index == "existing" then
+        session:stack(existing(obj))
+      elseif selected.index == "middlewares" then
+        session:stack(configure_middlewares(obj))
+      elseif selected.index == "aliases" then
+        session:stack(parse_aliases(obj, obj.pwd .."/deps.edn"))
       end
     end
   }
 end
 
 jazz_nrepl.nrepl_menu = function(pwd)
-  pwd = pwd or vim.api.nvim_call_function("getcwd", {})
+  pwd = pwd or vim.fn.getcwd()
   if not acid_utils.ends_with(pwd, "/") then
     pwd = pwd .. "/"
   end
+  local session = impromptu.session()
 
-  local current = require('acid.connections').current[pwd]
-  local opts = {}
-
-  local check
-
-  if current ~= nil then
-    current = connections.store[current]
-    check = function (v)
-      return v[2] == current[2] and v[1] == current[1]
-    end
-  else
-    check = function(_) return false end
-  end
-
-  for ix, v in pairs(connections.store) do
-    if #v == 2 then
-      local opt = {}
-      local str = "nrepl://" .. v[1] .. ":" .. v[2]
-
-      if check(v) then
-        opts.close = {
-          description = "Close connection to " .. str ,
-          index = ix,
-          hl = "Function"
-        }
-
-        opts.refresh = {
-          description = "Refresh connections",
-          index = ix,
-          hl = "Function"
-        }
-
-        str = str .. " (current)"
-        opt.hl = "String"
-      end
-
-      opt.description = str
-      opt.index = ix
-      opts["conn" .. ix] = opt
-    end
-  end
-
-  opts.new = {
-    description = "Spawn new nrepl",
-    hl = "Function"
-  }
-
-  opts.custom = {
-    description = "Spawn custom nrepl",
-    hl = "Function"
-  }
-
-  opts.existing = {
-    description = "Connect to existing nrepl",
-    hl = "Function"
-  }
-
-  opts.toolsdeps = {
-    description = "Spawn from deps.edn",
-    hl = "Function"
-  }
-
-  impromptu.ask{
-    title = "🎵 Select nrepl to connect to:",
-    options = opts,
-    handler = function(session, selected)
-      if selected.index == "new" then
-        nrepl.start{pwd = pwd}
-      elseif selected.index == "close" then
-        nrepl.stop{pwd = pwd}
-      elseif selected.index == "refresh" then
-        nrepl.stop{pwd = pwd}
-        nrepl.start{pwd = pwd}
-      elseif selected.index == "toolsdeps" then
-        return toolsdeps{pwd = pwd, session = session}
-      elseif selected.index == "existing" then
-        session:stack(existing{pwd = pwd})
-        return false
-      elseif selected.index == "custom" then
-        session:stack(custom_nrepl{pwd = pwd})
-        return false
-      else
-        connections.select(pwd, selected.index)
-      end
-      return true
-    end
-  }
+  session:stack(custom_nrepl{
+    pwd = pwd,
+    session = session,
+    alias = {},
+    middlewares = nrepl.default_middlewares
+  }):render()
 end
 
 return jazz_nrepl
