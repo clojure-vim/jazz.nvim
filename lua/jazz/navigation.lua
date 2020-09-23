@@ -21,9 +21,7 @@ navigation.symbols = function(ns)
     end
 
   end
-  local bufnr = vim.api.nvim_get_current_buf()
-  local winnr = vim.api.nvim_call_function("bufwinnr", {bufnr})
-  local window = vim.api.nvim_call_function("win_getid", {winnr})
+  local winnr = vim.api.nvim_get_current_win()
 
   local filter = impromptu.filter{
     title = "🎵 Navigate to symbols",

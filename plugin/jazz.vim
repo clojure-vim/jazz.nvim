@@ -7,6 +7,7 @@ nmap <C-j>n <Cmd>JazzNrepl<CR>
 augroup Jazz
   au FileType clojure nmap <buffer> <C-j>u <Cmd>JazzFindUsages<Cr>
   au FileType clojure nmap <buffer> <C-j>s <Cmd>JazzNavigateSymbols<Cr>
+  au FileType clojure nmap <buffer> <C-j>r <Cmd>lua require("jazz.modules").select_add_require()<Cr>
   au FileType clojure nmap <buffer> <C-j>a <Cmd>lua require("jazz.files").alternate()<Cr>
   au FileType clojure nmap <buffer> <C-j>f <Cmd>lua require("jazz.files").new()<Cr>
 augroup END

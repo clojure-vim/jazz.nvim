@@ -17,7 +17,6 @@ usages.find_all = function(symbol, ns)
 
   local pwd = vim.api.nvim_call_function('getcwd', {})
   local window = vim.api.nvim_get_current_win()
-  local winnr = vim.api.nvim_call_function("win_id2win", {window})
   local fname = vim.api.nvim_call_function('expand', {"%:p"})
 
   local ui = impromptu.filter{
@@ -33,7 +32,8 @@ usages.find_all = function(symbol, ns)
       if fpath ==  fname then
         vim.api.nvim_win_set_cursor(window, {ln, col})
       else
-        vim.api.nvim_command(winnr .. "wincmd w | edit +" .. ln .. " " .. fpath)
+        vim.api.nvim_set_current_win(window)
+        vim.api.nvim_command("edit +" .. ln .. " " .. fpath)
       end
 
       return true

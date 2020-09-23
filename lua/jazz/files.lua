@@ -7,13 +7,13 @@ local files = {}
 files.alternate = function(file)
   file = file or vim.api.nvim_call_function("expand", {"%:p"})
   local window = vim.api.nvim_get_current_win()
-  local winnr = vim.api.nvim_call_function("win_id2win", {window})
   local ns = vim.api.nvim_call_function("AcidGetNs", {file})
   local alternates = vim.api.nvim_call_function("AcidAlternateFiles", {file})
 
   local new = function(ns, fname)
     vim.api.nvim_call_function("AcidNewFile", {ns, fname})
-    vim.api.nvim_command(winnr .. "wincmd w | edit " .. fname)
+    vim.api.nvim_set_current_win(winnr)
+    vim.api.nvim_command("edit " .. fname)
   end
 
   if utils.ends_with(ns, "-test") then
@@ -40,13 +40,13 @@ end
 
 files.new = function(window)
   window = window or vim.api.nvim_get_current_win()
-  local winnr = vim.api.nvim_call_function("win_id2win", {window})
     impromptu.form{
       title = "🎵 New file's namespace:",
       options = {ns = {description = "Namespace"}},
       handler = function(_, result)
         local fpath = vim.api.nvim_call_function("AcidNewFile", {result.ns, nil})
-        vim.api.nvim_command(winnr .. "wincmd w | edit " .. fpath)
+        vim.api.nvim_set_current_win(winnr)
+        vim.api.nvim_command("edit " .. fpath)
         return true
       end
   }

@@ -1,21 +1,22 @@
 -- luacheck: globals vim
+-- TODO Add optional alias
 local acid = require("acid")
 local ops = require("acid.ops")
 local impromptu = require("impromptu")
+local features = require("acid.features")
 
 local modules = {}
 
 modules.select_add_require = function()
 
-  local bufnr = vim.api.nvim_get_current_buf()
-  local winnr = vim.api.nvim_call_function("bufwinnr", {bufnr})
+  local winnr = vim.api.nvim_get_current_win()
 
   local filter = impromptu.filter{
     title = "🎵 Add :require dependency",
     options = {},
     handler = function(_, selected)
-      vim.api.nvim_command(winnr .. "wincmd w")
-      vim.api.nvim_call_function("AcidFnAddRequire", {selected.description})
+      vim.api.nvim_set_current_win(winnr)
+      features.add_require(selected.description)
       return true
     end
   }
