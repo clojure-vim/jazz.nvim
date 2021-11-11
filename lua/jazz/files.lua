@@ -44,7 +44,10 @@ files.new = function(window)
       title = "🎵 New file's namespace:",
       options = {ns = {description = "Namespace"}},
       handler = function(_, result)
-        local fpath = vim.api.nvim_call_function("AcidNewFile", {result.ns, nil})
+        local fpath = vim.fn.AcidNewFile(result.ns)
+        if fpath == nil then
+          fpath = tap(vim.fn.AcidNewFile(result.ns))
+        end
         vim.api.nvim_set_current_win(winnr)
         vim.api.nvim_command("edit " .. fpath)
         return true
